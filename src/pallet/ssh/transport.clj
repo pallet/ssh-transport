@@ -43,7 +43,7 @@
          {:type :pallet/ssh-connection-failure
           :cause e}
          (format
-          "ssh-fail: server %s, port %s, user %s"
+          "SSH connect : server %s, port %s, user %s"
           (:server endpoint)
           (:port endpoint 22)
           (-> authentication :user :username)))))))
@@ -58,7 +58,7 @@
          {:type :pallet/sftp-channel-failure
           :cause e}
          (format
-          "ssh-fail: server %s, port %s, user %s"
+          "SSH connect SFTP : server %s, port %s, user %s"
           (:server endpoint)
           (:port endpoint 22)
           (-> authentication :user :username)))))))
@@ -101,11 +101,11 @@
     (ssh/disconnect ssh-session))
   state)
 
-(defn send-file
+(defn send-stream
   [{:keys [sftp-channel] :as state} source destination]
   (ssh/sftp
    sftp-channel
-   :put (io/input-stream (io/file source))
+   :put source
    destination
    :return-map true))
 
