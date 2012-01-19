@@ -115,7 +115,7 @@
 (deftest connection-fail-test
   (is
    (thrown-with-msg?
-     slingshot.Stone #"SSH connect : server somewhere-non-existent"
+     slingshot.ExceptionInfo #"SSH connect : server somewhere-non-existent"
      (test-connect-fail
       {:server "somewhere-non-existent"}
       {:user {:private-key-path (default-private-key-path)

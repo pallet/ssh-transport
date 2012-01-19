@@ -2,10 +2,11 @@
   "Implementation of execution over ssh"
   (:require
    [clj-ssh.ssh :as ssh]
-   [slingshot.core :as slingshot]
    [clojure.java.io :as io]
    [clojure.string :as string]
-   [clojure.tools.logging :as logging]))
+   [clojure.tools.logging :as logging])
+  (:use
+   [slingshot.slingshot :only [throw+]]))
 
 (defonce default-agent-atom (atom nil))
 
@@ -39,7 +40,7 @@
     (try
       (ssh/connect ssh-session)
       (catch Exception e
-        (slingshot/throw+
+        (throw+
          {:type :pallet/ssh-connection-failure
           :cause e}
          (format
@@ -54,7 +55,7 @@
     (try
       (ssh/connect sftp-channel)
       (catch Exception e
-        (slingshot/throw+
+        (throw+
          {:type :pallet/sftp-channel-failure
           :cause e}
          (format
