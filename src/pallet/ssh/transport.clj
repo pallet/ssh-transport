@@ -23,7 +23,8 @@
   [agent private-key-path passphrase]
   (if passphrase
     (ssh/add-identity agent private-key-path passphrase)
-    (ssh/add-identity-with-keychain agent private-key-path)))
+    (when private-key-path
+      (ssh/add-identity-with-keychain agent private-key-path))))
 
 (defn ssh-user-credentials
   "Middleware to user the session :user credentials for SSH authentication."
