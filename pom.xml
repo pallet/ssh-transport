@@ -56,7 +56,7 @@
     <dependency>
       <groupId>org.cloudhoist</groupId>
       <artifactId>pallet-common</artifactId>
-      <version>0.2.2-SNAPSHOT</version>
+      <version>0.2.2</version>
     </dependency>
     <dependency>
       <groupId>clj-ssh</groupId>
@@ -79,7 +79,6 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-
 
   <developers>
     <developer>
@@ -104,25 +103,5 @@
       <url>http://cemerick.com</url>
     </contributor>
   </contributors>
-
-  <!-- make sure we can find the parent pom -->
-  <repositories>
-    <repository>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <id>sonatype-nexus-releases</id>
-      <name>Sonatype Nexus Releases</name>
-      <url>http://oss.sonatype.org/content/repositories/releases</url>
-    </repository>
-    <repository>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots</name>
-      <url>http://oss.sonatype.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
 
 </project>
