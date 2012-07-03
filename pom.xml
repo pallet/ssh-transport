@@ -4,12 +4,11 @@
   <parent>
     <groupId>org.cloudhoist</groupId>
     <artifactId>pallet-pom</artifactId>
-    <version>0.7.1-SNAPSHOT</version>
-    <relativePath>../pallet-pom/pom.xml</relativePath>
+    <version>0.7.1</version>
   </parent>
   <groupId>org.cloudhoist</groupId>
   <artifactId>ssh-transport</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.1-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>ssh-transport</name>
   <description>
@@ -57,35 +56,29 @@
     <dependency>
       <groupId>org.cloudhoist</groupId>
       <artifactId>pallet-common</artifactId>
-      <version>0.2.1</version>
+      <version>0.2.2</version>
     </dependency>
     <dependency>
       <groupId>clj-ssh</groupId>
       <artifactId>clj-ssh</artifactId>
-      <version>0.3.0</version>
+      <version>0.3.1</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>1.6.1</version>
-      <optional>true</optional>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-core</artifactId>
-      <version>1.0.0</version>
-      <optional>true</optional>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.0.0</version>
-      <optional>true</optional>
       <scope>test</scope>
     </dependency>
   </dependencies>
-
 
   <developers>
     <developer>
@@ -110,25 +103,5 @@
       <url>http://cemerick.com</url>
     </contributor>
   </contributors>
-
-  <!-- make sure we can find the parent pom -->
-  <repositories>
-    <repository>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <id>sonatype-nexus-releases</id>
-      <name>Sonatype Nexus Releases</name>
-      <url>http://oss.sonatype.org/content/repositories/releases</url>
-    </repository>
-    <repository>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus Snapshots</name>
-      <url>http://oss.sonatype.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
 
 </project>

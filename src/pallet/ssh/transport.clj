@@ -2,10 +2,11 @@
   "Implementation of execution over ssh"
   (:require
    [clj-ssh.ssh :as ssh]
-   [slingshot.core :as slingshot]
    [clojure.java.io :as io]
    [clojure.string :as string]
-   [clojure.tools.logging :as logging]))
+   [clojure.tools.logging :as logging])
+  (:use
+   [slingshot.slingshot :only [throw+]]))
 
 (defonce default-agent-atom (atom nil))
 
@@ -22,7 +23,8 @@
   [agent private-key-path passphrase]
   (if passphrase
     (ssh/add-identity agent private-key-path passphrase)
-    (ssh/add-identity-with-keychain agent private-key-path)))
+    (when private-key-path
+      (ssh/add-identity-with-keychain agent private-key-path))))
 
 (defn ssh-user-credentials
   "Middleware to user the session :user credentials for SSH authentication."
@@ -39,11 +41,11 @@
     (try
       (ssh/connect ssh-session)
       (catch Exception e
-        (slingshot/throw+
+        (throw+
          {:type :pallet/ssh-connection-failure
           :cause e}
          (format
-          "ssh-fail: server %s, port %s, user %s"
+          "SSH connect : server %s, port %s, user %s"
           (:server endpoint)
           (:port endpoint 22)
           (-> authentication :user :username)))))))
@@ -54,11 +56,11 @@
     (try
       (ssh/connect sftp-channel)
       (catch Exception e
-        (slingshot/throw+
+        (throw+
          {:type :pallet/sftp-channel-failure
           :cause e}
          (format
-          "ssh-fail: server %s, port %s, user %s"
+          "SSH connect SFTP : server %s, port %s, user %s"
           (:server endpoint)
           (:port endpoint 22)
           (-> authentication :user :username)))))))
@@ -101,11 +103,11 @@
     (ssh/disconnect ssh-session))
   state)
 
-(defn send-file
+(defn send-stream
   [{:keys [sftp-channel] :as state} source destination]
   (ssh/sftp
    sftp-channel
-   :put (io/input-stream (io/file source))
+   :put source
    destination
    :return-map true))
 

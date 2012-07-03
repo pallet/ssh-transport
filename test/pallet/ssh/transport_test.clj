@@ -2,6 +2,7 @@
   (:use
    clojure.test)
   (:require
+   [clojure.java.io :as io]
    [pallet.common.filesystem :as filesystem]
    [pallet.common.logging.logutils :as logutils]
    [pallet.ssh.transport :as transport]))
@@ -57,10 +58,11 @@
 (defn test-send
   [endpoint authorisation options]
   (let [t-state (transport/open endpoint authorisation options)]
-    (testing "send-file"
+    (testing "send"
       (filesystem/with-temp-file [tmp-src "src"]
         (filesystem/with-temp-file [tmp-dest "dest"]
-          (transport/send-file t-state (.getPath tmp-src) (.getPath tmp-dest))
+          (transport/send-stream
+           t-state (io/input-stream (.getPath tmp-src)) (.getPath tmp-dest))
           (is (= "src" (slurp tmp-dest))))))
     (testing "send-text"
       (filesystem/with-temp-file [tmp-dest "dest"]
@@ -70,13 +72,7 @@
       (filesystem/with-temp-file [tmp-src "src"]
         (filesystem/with-temp-file [tmp-dest "dest"]
           (transport/receive t-state (.getPath tmp-src) (.getPath tmp-dest))
-          (is (= "src" (slurp tmp-dest))))))
-    (testing "send-file with non-existing path"
-      (is
-       (thrown-with-msg?
-         java.io.FileNotFoundException #"/some/non-existing/path"
-         (transport/send-file
-          t-state "/some/non-existing/path" "/invalid"))))))
+          (is (= "src" (slurp tmp-dest))))))))
 
 (defn test-connect-fail
   [endpoint authorisation options]
@@ -119,7 +115,7 @@
 (deftest connection-fail-test
   (is
    (thrown-with-msg?
-     slingshot.Stone #"ssh-fail: server somewhere-non-existent"
+     slingshot.ExceptionInfo #"SSH connect : server somewhere-non-existent"
      (test-connect-fail
       {:server "somewhere-non-existent"}
       {:user {:private-key-path (default-private-key-path)
