@@ -34,16 +34,47 @@
     (possibly-add-identity
      (default-agent) (:private-key-path user) (:passphrase user))))
 
+(defn port-reachable?
+  ([ip port timeout]
+     (let [socket (doto (java.net.Socket.)
+                    (.setReuseAddress false)
+                    (.setSoLinger false 1)
+                    (.setSoTimeout timeout))]
+       (try
+         (.connect socket (java.net.InetSocketAddress. ip port))
+         true
+         (catch java.io.IOException _)
+         (finally
+           (try (.close socket) (catch java.io.IOException _))))))
+  ([ip port]
+     (port-reachable? ip port 2000)))
+
+(defn wait-for-port-reachable
+  [ip port]
+  (when-not (loop [retries 180]
+              (if (port-reachable? ip port)
+                true
+                (when (pos? retries) (recur (dec retries)))))
+    (throw+
+     {:type :pallet/ssh-connection-failure
+      :ip ip
+      :port port}
+     (format "SSH port not reachable : server %s, port %s" ip port))))
+
 (defn connect-ssh-session
   [ssh-session endpoint authentication]
   (when-not (ssh/connected? ssh-session)
     (logging/debugf "SSH connecting %s" endpoint)
     (try
+      (wait-for-port-reachable (:server endpoint) (:port endpoint 22))
       (ssh/connect ssh-session)
       (catch Exception e
         (throw+
          {:type :pallet/ssh-connection-failure
-          :cause e}
+          :cause e
+          :ip (:server endpoint)
+          :port (:port endpoint 22)
+          :user (-> authentication :user :username)}
          (format
           "SSH connect : server %s, port %s, user %s"
           (:server endpoint)
