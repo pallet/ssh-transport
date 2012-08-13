@@ -135,20 +135,28 @@
   state)
 
 (defn send-stream
-  [{:keys [sftp-channel] :as state} source destination]
-  (ssh/sftp
-   sftp-channel
-   :put source
-   destination
-   :return-map true))
+  [{:keys [sftp-channel] :as state} source destination {:keys [mode]}]
+  [(ssh/sftp
+    sftp-channel
+    :put source destination
+    :return-map true)
+   (when mode
+     (ssh/sftp
+      sftp-channel
+      :chmod mode destination
+      :return-map true))])
 
 (defn send-text
-  [{:keys [sftp-channel] :as state} source destination]
-  (ssh/sftp
-   sftp-channel
-   :put (java.io.ByteArrayInputStream. (.getBytes source))
-   destination
-   :return-map true))
+  [{:keys [sftp-channel] :as state} source destination {:keys [mode]}]
+  [(ssh/sftp
+    sftp-channel
+    :put (java.io.ByteArrayInputStream. (.getBytes source)) destination
+    :return-map true)
+   (when mode
+     (ssh/sftp
+      sftp-channel
+      :chmod mode destination
+      :return-map true))])
 
 (defn receive
   [{:keys [sftp-channel] :as state} source destination]
