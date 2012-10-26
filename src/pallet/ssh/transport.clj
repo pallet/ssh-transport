@@ -30,7 +30,7 @@
   "Middleware to user the session :user credentials for SSH authentication."
   [authentication]
   (let [user (:user authentication)]
-    (logging/infof "SSH user %s %s" (:username user) (:private-key-path user))
+    (logging/debugf "SSH user %s %s" (:username user) (:private-key-path user))
     (possibly-add-identity
      (default-agent) (:private-key-path user) (:passphrase user))))
 
@@ -210,7 +210,7 @@
         (if (zero? exit)
           {:out stdout :exit exit}
           (do
-            (logging/errorf "Exit status  : %s" exit)
+            (logging/errorf "%s Exit status  : %s" (:server endpoint) exit)
             {:out stdout :exit exit
              :error {:message (format
                                "Error executing script :\n :cmd %s\n :out %s\n"
