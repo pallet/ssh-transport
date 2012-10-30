@@ -15,16 +15,17 @@
   (or @default-agent-atom
       (swap! default-agent-atom
              (fn [agent]
-               (if agent
-                 agent
-                 (ssh/create-ssh-agent false))))))
+               (if agent agent (ssh/ssh-agent {}))))))
 
 (defn possibly-add-identity
   [agent private-key-path passphrase]
-  (if passphrase
-    (ssh/add-identity agent private-key-path passphrase)
-    (when private-key-path
-      (ssh/add-identity-with-keychain agent private-key-path))))
+  (try
+    (when-not (ssh/has-identity? agent private-key-path)
+      (ssh/add-identity
+       agent {:private-key-path private-key-path :passphrase passphrase}))
+    (catch Exception e
+      (logging/warnf "Couldn't add key: %s" (.getMessage e))
+      (logging/debugf e "Couldn't add key"))))
 
 (defn ssh-user-credentials
   "Middleware to user the session :user credentials for SSH authentication."
@@ -83,7 +84,7 @@
 
 (defn connect-sftp-channel
   [sftp-channel endpoint authentication]
-  (when-not (ssh/connected? sftp-channel)
+  (when-not (ssh/connected-channel? sftp-channel)
     (try
       (ssh/connect sftp-channel)
       (catch Exception e
@@ -101,11 +102,11 @@
      (let [ssh-session (ssh/session
                         (default-agent)
                         (:server endpoint)
-                        :username (-> authentication :user :username)
-                        :strict-host-key-checking (:strict-host-key-checking
-                                                   options :no)
-                        :port (:port endpoint 22)
-                        :password (-> authentication :user :password))
+                        {:username (-> authentication :user :username)
+                         :strict-host-key-checking (:strict-host-key-checking
+                                                    options :no)
+                         :port (:port endpoint 22)
+                         :password (-> authentication :user :password)})
            _ (.setDaemonThread ssh-session true)
            _ (connect-ssh-session ssh-session endpoint authentication)
            sftp-channel (ssh/ssh-sftp ssh-session)]
@@ -116,10 +117,13 @@
         :authentication authentication
         :options options}))
   ([state]
-     (let [ssh-session (:ssh-session state)
-           _ (connect-ssh-session ssh-session)
+     (let [state (.state state)
+           ssh-session (:ssh-session state)
+           _ (connect-ssh-session
+              ssh-session (:endpoint state) (:authentication state))
            sftp-channel (:sftp-channel state)]
-       (connect-sftp-channel sftp-channel)
+       (connect-sftp-channel
+        sftp-channel (:endpoint state) (:authentication state))
        state)))
 
 (defn close
@@ -128,7 +132,7 @@
   (logging/debugf "SSH close %s" endpoint)
   (when sftp-channel
     (logging/debugf "SSH disconnect SFTP %s" endpoint)
-    (ssh/disconnect sftp-channel))
+    (ssh/disconnect-channel sftp-channel))
   (when ssh-session
     (logging/debugf "SSH disconnect SSH %s" endpoint)
     (ssh/disconnect ssh-session))
@@ -136,31 +140,22 @@
 
 (defn send-stream
   [{:keys [sftp-channel] :as state} source destination {:keys [mode]}]
-  [(ssh/sftp
-    sftp-channel
-    :put source destination
-    :return-map true)
+  [(ssh/sftp sftp-channel {} :put source destination)
    (when mode
-     (ssh/sftp
-      sftp-channel
-      :chmod mode destination
-      :return-map true))])
+     (ssh/sftp sftp-channel {} :chmod mode destination))])
 
 (defn send-text
   [{:keys [sftp-channel] :as state} source destination {:keys [mode]}]
   [(ssh/sftp
-    sftp-channel
-    :put (java.io.ByteArrayInputStream. (.getBytes source)) destination
-    :return-map true)
+    sftp-channel {}
+    :put (java.io.ByteArrayInputStream. (.getBytes source)) destination)
    (when mode
-     (ssh/sftp
-      sftp-channel
-      :chmod mode destination
-      :return-map true))])
+     (ssh/sftp sftp-channel {} :chmod mode destination))])
 
 (defn receive
   [{:keys [sftp-channel] :as state} source destination]
-  (ssh/sftp sftp-channel :get source (io/output-stream (io/file destination))))
+  (ssh/sftp
+   sftp-channel {} :get source (io/output-stream (io/file destination))))
 
 (def
   ^{:doc "Specifies the buffer size used to read the ssh output stream.
@@ -180,15 +175,14 @@
   (logging/tracef "ssh/exec %s" (pr-str state))
   (logging/tracef "ssh/exec session connected %s" (ssh/connected? ssh-session))
   (if output-f
-    (let [[shell stream] (apply
-                          ssh/ssh
-                          ssh-session
-                          (concat
-                           (when-let [execv (seq execv)]
-                             [(apply
-                              str (interpose " " (map str execv)))])
-                           [:in in :return-map true
-                            :pty (:pty options true) :out :stream]))
+    (let [{:keys [channel out-stream]} (ssh/ssh
+                                        ssh-session
+                                        {:cmd (string/join " " execv)
+                                         :in in
+                                         :pty (:pty options true)
+                                         :out :stream})
+          shell channel
+          stream out-stream
           sb (StringBuilder.)
           buffer-size @ssh-output-buffer-size
           period @output-poll-period
@@ -200,7 +194,7 @@
                            (output-f s)
                            (.append sb s)
                            s)))]
-      (while (ssh/connected? shell)
+      (while (ssh/connected-channel? shell)
         (Thread/sleep period)
         (read-ouput))
       (while (read-ouput))
@@ -219,16 +213,15 @@
                      :script-exit exit
                      :script-out stdout
                      :server (:server endpoint)}}))))
-    (let [{:keys [out exit] :as result} (apply
-                                         ssh/ssh
+    (let [{:keys [out exit] :as result} (ssh/ssh
                                          ssh-session
-                                         (concat
+                                         (merge
                                           (when-let [execv (seq execv)]
-                                            [(apply
-                                              str
-                                              (interpose " " (map str execv)))])
-                                          [:in in :return-map true
-                                           :pty (:pty options true)]))]
+                                            {:cmd (apply
+                                                   str
+                                                   (interpose
+                                                    " " (map str execv)))})
+                                          {:in in :pty (:pty options true)}))]
 
       (if (zero? exit)
         result
