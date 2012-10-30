@@ -3,6 +3,14 @@
 Functions for executing scripts over SSH.  Used by
 [pallet](https://github.com/pallet/pallet).
 
+## Usage
+
+Add the following to your `:dependencies`:
+
+```clj
+[org.cloudhoist/ssh-transport "0.2.0"]
+```
+
 ## License
 
 Licensed under [EPL](http://www.eclipse.org/legal/epl-v10.html)
