@@ -6,7 +6,7 @@
    [clojure.string :as string]
    [clojure.tools.logging :as logging])
   (:use
-   [slingshot.slingshot :only [throw+]]))
+   [slingshot.slingshot :only [throw+ try+]]))
 
 (defonce default-agent-atom (atom nil))
 
@@ -66,13 +66,12 @@
   [ssh-session endpoint authentication]
   (when-not (ssh/connected? ssh-session)
     (logging/debugf "SSH connecting %s" endpoint)
-    (try
+    (try+
       (wait-for-port-reachable (:server endpoint) (:port endpoint 22))
       (ssh/connect ssh-session)
       (catch Exception e
         (throw+
          {:type :pallet/ssh-connection-failure
-          :cause e
           :ip (:server endpoint)
           :port (:port endpoint 22)
           :user (-> authentication :user :username)}
@@ -85,37 +84,53 @@
 (defn connect-sftp-channel
   [sftp-channel endpoint authentication]
   (when-not (ssh/connected-channel? sftp-channel)
-    (try
+    (try+
       (ssh/connect sftp-channel)
       (catch Exception e
         (throw+
-         {:type :pallet/sftp-channel-failure
-          :cause e}
+         {:type :pallet/sftp-channel-failure}
          (format
           "SSH connect SFTP : server %s, port %s, user %s"
           (:server endpoint)
           (:port endpoint 22)
           (-> authentication :user :username)))))))
 
+(defn attempt-connect
+  [endpoint authentication options]
+  (let [ssh-session (ssh/session
+                     (default-agent)
+                     (:server endpoint)
+                     {:username (-> authentication :user :username)
+                      :strict-host-key-checking (:strict-host-key-checking
+                                                 options :no)
+                      :port (:port endpoint 22)
+                      :password (-> authentication :user :password)})
+        _ (.setDaemonThread ssh-session true)
+        _ (connect-ssh-session ssh-session endpoint authentication)
+        sftp-channel (ssh/ssh-sftp ssh-session)]
+    (connect-sftp-channel sftp-channel endpoint authentication)
+    {:ssh-session ssh-session
+     :sftp-channel sftp-channel
+     :endpoint endpoint
+     :authentication authentication
+     :options options}))
+
 (defn connect
-  ([endpoint authentication options]
-     (let [ssh-session (ssh/session
-                        (default-agent)
-                        (:server endpoint)
-                        {:username (-> authentication :user :username)
-                         :strict-host-key-checking (:strict-host-key-checking
-                                                    options :no)
-                         :port (:port endpoint 22)
-                         :password (-> authentication :user :password)})
-           _ (.setDaemonThread ssh-session true)
-           _ (connect-ssh-session ssh-session endpoint authentication)
-           sftp-channel (ssh/ssh-sftp ssh-session)]
-       (connect-sftp-channel sftp-channel endpoint authentication)
-       {:ssh-session ssh-session
-        :sftp-channel sftp-channel
-        :endpoint endpoint
-        :authentication authentication
-        :options options}))
+  "Connect to the ssh endpoint, optionally specifying the maximum number
+   of connection attempts, and the backoff between each attempt."
+  ([endpoint authentication {:keys [max-tries backoff] :as options}]
+     (loop [max-tries (or max-tries 1) e nil]
+       (if (pos? max-tries)
+         (let [[s e] (try
+                       [(attempt-connect endpoint authentication options)]
+                       (catch Exception e
+                         [nil e]))]
+           (if s
+             s
+             (do
+               (Thread/sleep (or backoff 2000))
+               (recur (dec max-tries) e))))
+         (throw e))))
   ([state]
      (let [state (.state state)
            ssh-session (:ssh-session state)
