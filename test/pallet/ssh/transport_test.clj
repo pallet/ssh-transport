@@ -119,10 +119,22 @@
 (deftest connection-fail-test
   (is
    (thrown-with-msg?
-     slingshot.ExceptionInfo #"SSH connect : server somewhere-non-existent"
+     slingshot.ExceptionInfo
+     #"SSH port not reachable : server somewhere-non-existent"
      (test-connect-fail
       {:server "somewhere-non-existent"}
       {:user {:private-key-path (default-private-key-path)
               :public-key-path (default-public-key-path)
               :username (test-username)}}
-      nil))))
+      nil)))
+  (testing "with retries"
+    (is
+     (thrown-with-msg?
+       slingshot.ExceptionInfo
+       #"SSH port not reachable : server somewhere-non-existent"
+       (test-connect-fail
+        {:server "somewhere-non-existent"}
+        {:user {:private-key-path (default-private-key-path)
+                :public-key-path (default-public-key-path)
+                :username (test-username)}}
+        {:max-tries 3 :backoff 100})))))
