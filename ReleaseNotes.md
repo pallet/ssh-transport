@@ -1,3 +1,7 @@
+# 0.2.1
+
+- Add retries on failed connect
+
 # 0.2.0
 
 - Update to clj-ssh 0.4.3
