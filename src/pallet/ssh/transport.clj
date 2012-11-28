@@ -32,8 +32,9 @@
   [authentication]
   (let [user (:user authentication)]
     (logging/debugf "SSH user %s %s" (:username user) (:private-key-path user))
-    (possibly-add-identity
-     (default-agent) (:private-key-path user) (:passphrase user))))
+    (when (:private-key-path user)
+      (possibly-add-identity
+       (default-agent) (:private-key-path user) (:passphrase user)))))
 
 (defn port-reachable?
   ([ip port timeout]
