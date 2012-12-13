@@ -1,3 +1,7 @@
+# 0.2.2
+
+- Don't try adding nil key to ssh-agent
+
 # 0.2.1
 
 - Add retries on failed connect
