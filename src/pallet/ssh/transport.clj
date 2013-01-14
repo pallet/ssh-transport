@@ -221,6 +221,7 @@
           {:out stdout :exit exit}
           (do
             (logging/errorf "%s Exit status  : %s" (:server endpoint) exit)
+            (logging/infof "%s Output       : %s" (:server endpoint) stdout)
             {:out stdout :exit exit
              :error {:message (format
                                "Error executing script :\n :cmd %s\n :out %s\n"
