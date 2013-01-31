@@ -189,7 +189,7 @@
 (def
   ^{:doc "Specifies the polling period for retrieving ssh command output.
     Defaults to 1000ms."}
-  output-poll-period (atom 1000))
+  output-poll-period (atom 100))
 
 (defn exec
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
