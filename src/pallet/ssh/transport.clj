@@ -225,19 +225,9 @@
       (.close stream)
       (let [exit (.getExitStatus shell)
             stdout (str sb)]
-        (if (zero? exit)
-          {:out stdout :exit exit}
-          (do
-            (logging/errorf "%s Exit status  : %s" (:server endpoint) exit)
-            (logging/infof "%s Output       : %s" (:server endpoint) stdout)
-            {:out stdout :exit exit
-             :error {:message (format
-                               "Error executing script :\n :cmd %s\n :out %s\n"
-                               code stdout)
-                     :type :pallet-script-excution-error
-                     :script-exit exit
-                     :script-out stdout
-                     :server (:server endpoint)}}))))
+        (when-not (zero? exit)
+          (logging/warnf "%s Exit status  : %s" (:server endpoint) exit))
+        {:out stdout :exit exit}))
     (let [{:keys [out exit] :as result} (ssh/ssh
                                          ssh-session
                                          (merge
@@ -247,19 +237,9 @@
                                                    (interpose
                                                     " " (map str execv)))})
                                           {:in in :pty (:pty options true)}))]
-
-      (if (zero? exit)
-        result
-        (do
-          (logging/errorf "Exit status  : %s" exit)
-          {:out out :exit exit
-           :error {:message (format
-                             "Error executing script :\n :cmd %s\n :out %s\n"
-                             code out)
-                   :type :pallet-script-excution-error
-                   :script-exit exit
-                   :script-out out
-                   :server (:server endpoint)}})))))
+      (when-not (zero? exit)
+        (logging/warnf "Exit status  : %s" exit))
+      result)))
 
 (defn forward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
