@@ -119,19 +119,30 @@
 (deftest connection-fail-test
   (is
    (thrown-with-msg?
-     slingshot.ExceptionInfo
-     #"SSH port not reachable : server somewhere-non-existent"
+     clojure.lang.ExceptionInfo
+     #"SSH connect : server somewhere-non-existent, port 22"
      (test-connect-fail
       {:server "somewhere-non-existent"}
       {:user {:private-key-path (default-private-key-path)
               :public-key-path (default-public-key-path)
               :username (test-username)}}
       nil)))
+  (try
+    (test-connect-fail
+     {:server "somewhere-non-existent"}
+     {:user {:private-key-path (default-private-key-path)
+             :public-key-path (default-public-key-path)
+             :username (test-username)}}
+     nil)
+    (catch clojure.lang.ExceptionInfo e
+      (is (= "SSH port not reachable : server somewhere-non-existent, port 22"
+             (.. e getCause getMessage))
+          "Cause should be a port not reachable exception")))
   (testing "with retries"
     (is
      (thrown-with-msg?
-       slingshot.ExceptionInfo
-       #"SSH port not reachable : server somewhere-non-existent"
+       clojure.lang.ExceptionInfo
+       #"SSH connect : server somewhere-non-existent, port 22"
        (test-connect-fail
         {:server "somewhere-non-existent"}
         {:user {:private-key-path (default-private-key-path)
