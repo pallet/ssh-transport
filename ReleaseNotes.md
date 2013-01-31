@@ -1,3 +1,13 @@
+# 0.3.0
+
+- Remove the :error key map on non-zero exit
+  The generation of an error map should be the caller's responsibility.
+
+- Reduce script output polling interval
+
+- Update dependency versions
+  Depend on clojure 1.4.0, drop slingshot, and use clj-ssh 0.5.0.
+
 # 0.2.2
 
 - Don't try adding nil key to ssh-agent

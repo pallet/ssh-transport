@@ -8,11 +8,11 @@ Functions for executing scripts over SSH.  Used by
 Add the following to your `:dependencies`:
 
 ```clj
-[org.cloudhoist/ssh-transport "0.2.2"]
+[org.cloudhoist/ssh-transport "0.3.0"]
 ```
 
 ## License
 
 Licensed under [EPL](http://www.eclipse.org/legal/epl-v10.html)
 
-Copyright 2011, 2012  Hugo Duncan.
+Copyright 2011, 2012, 2013  Hugo Duncan.
