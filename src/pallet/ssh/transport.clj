@@ -4,10 +4,9 @@
    [clj-ssh.ssh :as ssh]
    [clojure.java.io :as io]
    [clojure.string :as string]
-   [clojure.tools.logging :as logging])
-  (:use
-   [slingshot.slingshot :only [throw+ try+]]))
+   [clojure.tools.logging :as logging]))
 
+;;; Default clj-ssh agent
 (defonce default-agent-atom (atom nil))
 
 (defn default-agent
@@ -18,6 +17,7 @@
                (if agent agent (ssh/ssh-agent {}))))))
 
 (defn possibly-add-identity
+  "Try adding the given identity, logging issues, but not raising an error."
   [agent private-key-path passphrase]
   (try
     (when-not (ssh/has-identity? agent private-key-path)
@@ -37,6 +37,7 @@
        (default-agent) (:private-key-path user) (:passphrase user)))))
 
 (defn port-reachable?
+  "Predicate test if a we can connect to the given `port` on `ip`."
   ([ip port timeout]
      (let [socket (doto (java.net.Socket.)
                     (.setReuseAddress false)
@@ -52,49 +53,56 @@
      (port-reachable? ip port 2000)))
 
 (defn wait-for-port-reachable
+  "Wait for a port to be reachable. Retries multiple times with a default
+   connection timeout on each attempt."
   [ip port]
   (when-not (loop [retries 180]
               (if (port-reachable? ip port)
                 true
                 (when (pos? retries) (recur (dec retries)))))
-    (throw+
-     {:type :pallet/ssh-connection-failure
-      :ip ip
-      :port port}
-     (format "SSH port not reachable : server %s, port %s" ip port))))
+    (throw
+     (ex-info
+      (format "SSH port not reachable : server %s, port %s" ip port)
+      {:type :pallet/ssh-connection-failure
+       :ip ip
+       :port port}))))
 
 (defn connect-ssh-session
   [ssh-session endpoint authentication]
   (when-not (ssh/connected? ssh-session)
     (logging/debugf "SSH connecting %s" endpoint)
-    (try+
+    (try
       (wait-for-port-reachable (:server endpoint) (:port endpoint 22))
       (ssh/connect ssh-session)
       (catch Exception e
-        (throw+
-         {:type :pallet/ssh-connection-failure
-          :ip (:server endpoint)
-          :port (:port endpoint 22)
-          :user (-> authentication :user :username)}
-         (format
-          "SSH connect : server %s, port %s, user %s"
-          (:server endpoint)
-          (:port endpoint 22)
-          (-> authentication :user :username)))))))
+        (throw
+         (ex-info
+          (format
+           "SSH connect : server %s, port %s, user %s"
+           (:server endpoint)
+           (:port endpoint 22)
+           (-> authentication :user :username))
+          {:type :pallet/ssh-connection-failure
+           :ip (:server endpoint)
+           :port (:port endpoint 22)
+           :user (-> authentication :user :username)}
+          e))))))
 
 (defn connect-sftp-channel
   [sftp-channel endpoint authentication]
   (when-not (ssh/connected-channel? sftp-channel)
-    (try+
+    (try
       (ssh/connect sftp-channel)
       (catch Exception e
-        (throw+
-         {:type :pallet/sftp-channel-failure}
-         (format
-          "SSH connect SFTP : server %s, port %s, user %s"
-          (:server endpoint)
-          (:port endpoint 22)
-          (-> authentication :user :username)))))))
+        (throw
+         (ex-info
+          (format
+           "SSH connect SFTP : server %s, port %s, user %s"
+           (:server endpoint)
+           (:port endpoint 22)
+           (-> authentication :user :username))
+          {:type :pallet/sftp-channel-failure}
+          e))))))
 
 (defn attempt-connect
   [endpoint authentication options]
