@@ -1,3 +1,7 @@
+# 0.3.1
+
+- Support literal key strings in user
+
 # 0.3.0
 
 - Remove the :error key map on non-zero exit
