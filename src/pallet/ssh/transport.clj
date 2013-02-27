@@ -18,11 +18,10 @@
 
 (defn possibly-add-identity
   "Try adding the given identity, logging issues, but not raising an error."
-  [agent private-key-path passphrase]
+  [agent {:keys [private-key private-key-path passphrase] :as credentials}]
   (try
     (when-not (ssh/has-identity? agent private-key-path)
-      (ssh/add-identity
-       agent {:private-key-path private-key-path :passphrase passphrase}))
+      (ssh/add-identity agent credentials))
     (catch Exception e
       (logging/warnf "Couldn't add key: %s" (.getMessage e))
       (logging/debugf e "Couldn't add key"))))
@@ -31,10 +30,11 @@
   "Middleware to user the session :user credentials for SSH authentication."
   [authentication]
   (let [user (:user authentication)]
-    (logging/debugf "SSH user %s %s" (:username user) (:private-key-path user))
-    (when (:private-key-path user)
-      (possibly-add-identity
-       (default-agent) (:private-key-path user) (:passphrase user)))))
+    (logging/debugf
+     "SSH user %s :pk-path %s :pk %s"
+     (:username user) (:private-key-path user) (:private-key user))
+    (when (or (:private-key-path user) (:private-key user))
+      (possibly-add-identity (default-agent) user))))
 
 (defn port-reachable?
   "Predicate test if a we can connect to the given `port` on `ip`."
