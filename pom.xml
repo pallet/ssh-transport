@@ -8,7 +8,7 @@
   </parent>
   <groupId>org.cloudhoist</groupId>
   <artifactId>ssh-transport</artifactId>
-  <version>0.3.2-SNAPSHOT</version>
+  <version>0.3.3-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>ssh-transport</name>
   <description>
@@ -59,7 +59,7 @@
     <dependency>
       <groupId>clj-ssh</groupId>
       <artifactId>clj-ssh</artifactId>
-      <version>0.5.1</version>
+      <version>0.5.2</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
