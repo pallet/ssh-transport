@@ -1,3 +1,7 @@
+# 0.3.2
+
+- Update to clj-ssh 0.5.2
+
 # 0.3.1
 
 - Support literal key strings in user
