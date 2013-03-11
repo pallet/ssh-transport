@@ -4,7 +4,9 @@
    [clj-ssh.ssh :as ssh]
    [clojure.java.io :as io]
    [clojure.string :as string]
-   [clojure.tools.logging :as logging]))
+   [clojure.tools.logging :as logging])
+  (:import
+   [java.io InputStream IOException]))
 
 ;;; Default clj-ssh agent
 (defonce default-agent-atom (atom nil))
@@ -38,17 +40,17 @@
 
 (defn port-reachable?
   "Predicate test if a we can connect to the given `port` on `ip`."
-  ([ip port timeout]
+  ([^String ip port timeout]
      (let [socket (doto (java.net.Socket.)
                     (.setReuseAddress false)
                     (.setSoLinger false 1)
                     (.setSoTimeout timeout))]
        (try
-         (.connect socket (java.net.InetSocketAddress. ip port))
+         (.connect socket (java.net.InetSocketAddress. ip (int port)))
          true
-         (catch java.io.IOException _)
+         (catch IOException _)
          (finally
-           (try (.close socket) (catch java.io.IOException _))))))
+           (try (.close socket) (catch IOException _))))))
   ([ip port]
      (port-reachable? ip port 2000)))
 
@@ -177,7 +179,7 @@
      (ssh/sftp sftp-channel {} :chmod mode destination))])
 
 (defn send-text
-  [{:keys [sftp-channel] :as state} source destination {:keys [mode]}]
+  [{:keys [sftp-channel] :as state} ^String source destination {:keys [mode]}]
   [(ssh/sftp
     sftp-channel {}
     :put (java.io.ByteArrayInputStream. (.getBytes source)) destination)
@@ -207,22 +209,23 @@
   (logging/tracef "ssh/exec %s" (pr-str state))
   (logging/tracef "ssh/exec session connected %s" (ssh/connected? ssh-session))
   (if output-f
-    (let [{:keys [channel out-stream]} (ssh/ssh
-                                        ssh-session
-                                        {:cmd (string/join " " execv)
-                                         :in in
-                                         :pty (:pty options true)
-                                         :out :stream})
+    (let [{:keys [channel ^InputStream out-stream]}
+          (ssh/ssh
+           ssh-session
+           {:cmd (string/join " " execv)
+            :in in
+            :pty (:pty options true)
+            :out :stream})
           shell channel
           stream out-stream
           sb (StringBuilder.)
           buffer-size @ssh-output-buffer-size
           period @output-poll-period
-          bytes (byte-array buffer-size)
+          ^bytes bytes (byte-array buffer-size)
           read-ouput (fn []
                        (when (pos? (.available stream))
                          (let [num-read (.read stream bytes 0 buffer-size)
-                               s (String. bytes 0 num-read "UTF-8")]
+                               s (String. bytes 0 (int num-read) "UTF-8")]
                            (output-f s)
                            (.append sb s)
                            s)))]
@@ -231,7 +234,7 @@
         (read-ouput))
       (while (read-ouput))
       (.close stream)
-      (let [exit (.getExitStatus shell)
+      (let [exit (ssh/exit-status shell)
             stdout (str sb)]
         (when-not (zero? exit)
           (logging/warnf "%s Exit status  : %s" (:server endpoint) exit))
@@ -253,13 +256,14 @@
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
    remote-port
    local-port]
-  (.setPortForwardingL ssh-session local-port (:server endpoint) remote-port))
+  (ssh/forward-local-port
+   ssh-session local-port (:server endpoint) remote-port))
 
 (defn unforward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
    remote-port
    local-port]
-  (.delPortForwardingL ssh-session local-port))
+  (ssh/unforward-local-port ssh-session local-port))
 
 (defn connected?
   [state]
