@@ -25,7 +25,7 @@ lein with-profile +release set-version ${version} :previous-version ${previous_v
 echo ""
 echo ""
 echo "Changes since $previous_version"
-git --no-pager log --pretty=changelog local-transport-$previous_version..
+git --no-pager log --pretty=changelog ssh-transport-$previous_version..
 echo ""
 echo ""
 echo "Now edit project.clj, ReleaseNotes and README"
