@@ -8,7 +8,7 @@ Functions for executing scripts over SSH.  Used by
 Add the following to your `:dependencies`:
 
 ```clj
-[org.cloudhoist/ssh-transport "0.3.2"]
+[org.cloudhoist/ssh-transport "0.4.0"]
 ```
 
 ## License
