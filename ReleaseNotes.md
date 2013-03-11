@@ -1,3 +1,9 @@
+# 0.4.0
+
+- Remove reflection warnings
+
+- Update pallet-common and clj-ssh
+
 # 0.3.2
 
 - Update to clj-ssh 0.5.2
