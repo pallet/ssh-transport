@@ -120,7 +120,7 @@
   (is
    (thrown-with-msg?
      clojure.lang.ExceptionInfo
-     #"SSH connect : server somewhere-non-existent, port 22"
+     #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
      (test-connect-fail
       {:server "somewhere-non-existent"}
       {:user {:private-key-path (default-private-key-path)
@@ -142,7 +142,7 @@
     (is
      (thrown-with-msg?
        clojure.lang.ExceptionInfo
-       #"SSH connect : server somewhere-non-existent, port 22"
+       #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
        (test-connect-fail
         {:server "somewhere-non-existent"}
         {:user {:private-key-path (default-private-key-path)

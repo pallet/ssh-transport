@@ -78,10 +78,14 @@
         (throw
          (ex-info
           (format
-           "SSH connect : server %s, port %s, user %s"
+           "SSH connect: server %s port %s user %s password %s pk-path %s pk %s"
            (:server endpoint)
            (:port endpoint 22)
-           (-> authentication :user :username))
+           (-> authentication :user :username)
+           (when-let [p (-> authentication :user :password)]
+             (string/replace p #"." "*"))
+           (-> authentication :user :private-key-path)
+           (-> authentication :user :private-key))
           {:type :pallet/ssh-connection-failure
            :ip (:server endpoint)
            :port (:port endpoint 22)
@@ -106,6 +110,10 @@
 
 (defn attempt-connect
   [endpoint authentication options]
+  (logging/debugf
+   "attempt-connect username: %s  password: %s"
+   (-> authentication :user :username)
+   (-> authentication :user :password))
   (let [ssh-session (ssh/session
                      (default-agent)
                      (:server endpoint)
