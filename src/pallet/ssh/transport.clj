@@ -41,12 +41,14 @@
 (defn port-reachable?
   "Predicate test if a we can connect to the given `port` on `ip`."
   ([^String ip port timeout]
+     (logging/debugf "port-reachable? ip %s port %s timeout %s" ip port timeout)
      (let [socket (doto (java.net.Socket.)
                     (.setReuseAddress false)
                     (.setSoLinger false 1)
                     (.setSoTimeout timeout))]
        (try
          (.connect socket (java.net.InetSocketAddress. ip (int port)))
+         (logging/debugf "port-reachable? connected")
          true
          (catch IOException _)
          (finally
@@ -58,10 +60,16 @@
   "Wait for a port to be reachable. Retries multiple times with a default
    connection timeout on each attempt."
   [ip port]
-  (when-not (loop [retries 180]
+  (logging/debugf "wait-for-port-reachable ip %s port %s" ip port)
+  (when-not (loop [retries 180
+                   standoff 1000]
               (if (port-reachable? ip port)
                 true
-                (when (pos? retries) (recur (dec retries)))))
+                (when (pos? retries)
+                  (logging/debugf
+                   "wait-for-port-reachable standoff %s" standoff)
+                  (Thread/sleep standoff)
+                  (recur (dec retries) (long (* standoff 1.5))))))
     (throw
      (ex-info
       (format "SSH port not reachable : server %s, port %s" ip port)
@@ -100,6 +108,7 @@
     (try
       (ssh/connect sftp-channel)
       (catch Exception e
+        (logging/debugf "connect-sftp-channel failed: %s" (.getMessage e))
         (throw
          (ex-info
           (format
@@ -137,18 +146,26 @@
 (defn connect
   "Connect to the ssh endpoint, optionally specifying the maximum number
    of connection attempts, and the backoff between each attempt."
-  ([endpoint authentication {:keys [max-tries backoff] :as options}]
-     (loop [max-tries (or max-tries 1) e nil]
+  ([endpoint authentication
+    {:keys [max-tries backoff] :or {backoff 2000} :as options}]
+     (loop [max-tries (or max-tries 1)
+            backoff backoff
+            e nil]
        (if (pos? max-tries)
          (let [[s e] (try
                        [(attempt-connect endpoint authentication options)]
                        (catch Exception e
+                         (logging/debugf "connect failed: %s"
+                                         (if-let [e (.getCause e)]
+                                           (.getMessage e)
+                                           (.getMessage e)))
                          [nil e]))]
            (if s
              s
              (do
-               (Thread/sleep (or backoff 2000))
-               (recur (dec max-tries) e))))
+               (logging/debugf "connect backoff: %s" backoff)
+               (Thread/sleep backoff)
+               (recur (dec max-tries) (long (* backoff 1.5)) e))))
          (throw e))))
   ([state]
      (let [state (.state state)
