@@ -16,7 +16,16 @@
   (or @default-agent-atom
       (swap! default-agent-atom
              (fn [agent]
-               (if agent agent (ssh/ssh-agent {}))))))
+               (or agent (ssh/ssh-agent {}))))))
+
+(defn agent-for-authentication
+  "Returns an agent to use for authentication.  Returns the system ssh-agent,
+  unless the :temp-key is set in the :user map, in which case a local
+  ssh-agent is returned."
+  [authentication]
+  (if (-> authentication :user :temp-key)
+    (ssh/ssh-agent {:use-system-ssh-agent nil})
+    (default-agent)))
 
 (defn possibly-add-identity
   "Try adding the given identity, logging issues, but not raising an error."
@@ -30,13 +39,13 @@
 
 (defn ssh-user-credentials
   "Middleware to user the session :user credentials for SSH authentication."
-  [authentication]
+  [agent authentication]
   (let [user (:user authentication)]
     (logging/debugf
      "SSH user %s :pk-path %s :pk %s"
      (:username user) (:private-key-path user) (:private-key user))
     (when (or (:private-key-path user) (:private-key user))
-      (possibly-add-identity (default-agent) user))))
+      (possibly-add-identity agent user))))
 
 (defn port-reachable?
   "Predicate test if a we can connect to the given `port` on `ip`."
@@ -120,13 +129,13 @@
           e))))))
 
 (defn attempt-connect
-  [endpoint authentication options]
+  [agent endpoint authentication options]
   (logging/debugf
    "attempt-connect username: %s  password: %s"
    (-> authentication :user :username)
    (-> authentication :user :password))
   (let [ssh-session (ssh/session
-                     (default-agent)
+                     agent
                      (:server endpoint)
                      {:username (-> authentication :user :username)
                       :strict-host-key-checking (:strict-host-key-checking
@@ -146,14 +155,14 @@
 (defn connect
   "Connect to the ssh endpoint, optionally specifying the maximum number
    of connection attempts, and the backoff between each attempt."
-  ([endpoint authentication
+  ([agent endpoint authentication
     {:keys [max-tries backoff] :or {backoff 2000} :as options}]
      (loop [max-tries (or max-tries 1)
             backoff backoff
             e nil]
        (if (pos? max-tries)
          (let [[s e] (try
-                       [(attempt-connect endpoint authentication options)]
+                       [(attempt-connect agent endpoint authentication options)]
                        (catch Exception e
                          (logging/debugf "connect failed: %s"
                                          (if-let [e (.getCause e)]
@@ -287,5 +296,6 @@
   (ssh/connected? (:ssh-session state)))
 
 (defn open [endpoint authentication options]
-  (ssh-user-credentials authentication)
-  (connect endpoint authentication options))
+  (let [agent (agent-for-authentication authentication)]
+    (ssh-user-credentials agent authentication)
+    (connect agent endpoint authentication options)))
