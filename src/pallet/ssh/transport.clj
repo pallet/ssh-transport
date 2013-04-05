@@ -16,7 +16,16 @@
   (or @default-agent-atom
       (swap! default-agent-atom
              (fn [agent]
-               (if agent agent (ssh/ssh-agent {}))))))
+               (or agent (ssh/ssh-agent {}))))))
+
+(defn agent-for-authentication
+  "Returns an agent to use for authentication.  Returns the system ssh-agent,
+  unless the :temp-key is set in the :user map, in which case a local
+  ssh-agent is returned."
+  [authentication]
+  (if (-> authentication :user :temp-key)
+    (ssh/ssh-agent {:use-system-ssh-agent nil})
+    (default-agent)))
 
 (defn possibly-add-identity
   "Try adding the given identity, logging issues, but not raising an error."
@@ -30,23 +39,25 @@
 
 (defn ssh-user-credentials
   "Middleware to user the session :user credentials for SSH authentication."
-  [authentication]
+  [agent authentication]
   (let [user (:user authentication)]
     (logging/debugf
      "SSH user %s :pk-path %s :pk %s"
      (:username user) (:private-key-path user) (:private-key user))
     (when (or (:private-key-path user) (:private-key user))
-      (possibly-add-identity (default-agent) user))))
+      (possibly-add-identity agent user))))
 
 (defn port-reachable?
   "Predicate test if a we can connect to the given `port` on `ip`."
   ([^String ip port timeout]
+     (logging/debugf "port-reachable? ip %s port %s timeout %s" ip port timeout)
      (let [socket (doto (java.net.Socket.)
                     (.setReuseAddress false)
                     (.setSoLinger false 1)
                     (.setSoTimeout timeout))]
        (try
          (.connect socket (java.net.InetSocketAddress. ip (int port)))
+         (logging/debugf "port-reachable? connected")
          true
          (catch IOException _)
          (finally
@@ -57,11 +68,18 @@
 (defn wait-for-port-reachable
   "Wait for a port to be reachable. Retries multiple times with a default
    connection timeout on each attempt."
-  [ip port]
-  (when-not (loop [retries 180]
+  [ip port {:keys [port-retries port-standoff]
+            :or {port-retries 30 port-standoff 1000}}]
+  (logging/debugf "wait-for-port-reachable ip %s port %s" ip port)
+  (when-not (loop [retries port-retries
+                   standoff port-standoff]
               (if (port-reachable? ip port)
                 true
-                (when (pos? retries) (recur (dec retries)))))
+                (when (pos? retries)
+                  (logging/debugf
+                   "wait-for-port-reachable standoff %s" standoff)
+                  (Thread/sleep standoff)
+                  (recur (dec retries) (long (* standoff 1.5))))))
     (throw
      (ex-info
       (format "SSH port not reachable : server %s, port %s" ip port)
@@ -70,11 +88,12 @@
        :port port}))))
 
 (defn connect-ssh-session
-  [ssh-session endpoint authentication]
+  [ssh-session endpoint authentication
+   {:keys [port-retries port-standoff] :as options}]
   (when-not (ssh/connected? ssh-session)
     (logging/debugf "SSH connecting %s" endpoint)
     (try
-      (wait-for-port-reachable (:server endpoint) (:port endpoint 22))
+      (wait-for-port-reachable (:server endpoint) (:port endpoint 22) options)
       (ssh/connect ssh-session)
       (catch Exception e
         (throw
@@ -100,6 +119,7 @@
     (try
       (ssh/connect sftp-channel)
       (catch Exception e
+        (logging/debugf "connect-sftp-channel failed: %s" (.getMessage e))
         (throw
          (ex-info
           (format
@@ -111,13 +131,13 @@
           e))))))
 
 (defn attempt-connect
-  [endpoint authentication options]
+  [agent endpoint authentication options]
   (logging/debugf
    "attempt-connect username: %s  password: %s"
    (-> authentication :user :username)
    (-> authentication :user :password))
   (let [ssh-session (ssh/session
-                     (default-agent)
+                     agent
                      (:server endpoint)
                      {:username (-> authentication :user :username)
                       :strict-host-key-checking (:strict-host-key-checking
@@ -125,7 +145,7 @@
                       :port (:port endpoint 22)
                       :password (-> authentication :user :password)})
         _ (.setDaemonThread ssh-session true)
-        _ (connect-ssh-session ssh-session endpoint authentication)
+        _ (connect-ssh-session ssh-session endpoint authentication options)
         sftp-channel (ssh/ssh-sftp ssh-session)]
     (connect-sftp-channel sftp-channel endpoint authentication)
     {:ssh-session ssh-session
@@ -137,28 +157,27 @@
 (defn connect
   "Connect to the ssh endpoint, optionally specifying the maximum number
    of connection attempts, and the backoff between each attempt."
-  ([endpoint authentication {:keys [max-tries backoff] :as options}]
-     (loop [max-tries (or max-tries 1) e nil]
-       (if (pos? max-tries)
-         (let [[s e] (try
-                       [(attempt-connect endpoint authentication options)]
-                       (catch Exception e
-                         [nil e]))]
-           (if s
-             s
-             (do
-               (Thread/sleep (or backoff 2000))
-               (recur (dec max-tries) e))))
-         (throw e))))
-  ([state]
-     (let [state (.state state)
-           ssh-session (:ssh-session state)
-           _ (connect-ssh-session
-              ssh-session (:endpoint state) (:authentication state))
-           sftp-channel (:sftp-channel state)]
-       (connect-sftp-channel
-        sftp-channel (:endpoint state) (:authentication state))
-       state)))
+  [agent endpoint authentication
+   {:keys [max-tries backoff] :or {backoff 2000} :as options}]
+  (loop [max-tries (or max-tries 1)
+         backoff backoff
+         e nil]
+    (if (pos? max-tries)
+      (let [[s e] (try
+                    [(attempt-connect agent endpoint authentication options)]
+                    (catch Exception e
+                      (logging/debugf "connect failed: %s"
+                                      (if-let [e (.getCause e)]
+                                        (.getMessage e)
+                                        (.getMessage e)))
+                      [nil e]))]
+        (if s
+          s
+          (do
+            (logging/debugf "connect backoff: %s" backoff)
+            (Thread/sleep backoff)
+            (recur (dec max-tries) (long (* backoff 1.5)) e))))
+      (throw e))))
 
 (defn close
   "Close any ssh connection to the server specified in the session."
@@ -270,5 +289,6 @@
   (ssh/connected? (:ssh-session state)))
 
 (defn open [endpoint authentication options]
-  (ssh-user-credentials authentication)
-  (connect endpoint authentication options))
+  (let [agent (agent-for-authentication authentication)]
+    (ssh-user-credentials agent authentication)
+    (connect agent endpoint authentication options)))

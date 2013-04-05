@@ -1,3 +1,23 @@
+# 0.4.1
+
+- Update to clj-ssh 0.5.4
+  Includes fixed handling of literal key strings.
+
+- Add wait-for-port-reachable options
+  Allow specification of :port-retries and :port-backoff options.
+
+- Use local ssh-agent when :temp-key is true
+  To avoid temporary keys being added to the system ssh-agent, use a local
+  agent when :temp-key is true.
+
+- Make standoff increase in connection attempts
+  In order to reduce the number of connection attempts back-off connection 
+  attempts by a constant factor (fixed at 1.5 for now).
+
+  Also improves logging of connection attempts.
+
+- Remove connection function overload for state
+
 # 0.4.0
 
 - Remove reflection warnings
