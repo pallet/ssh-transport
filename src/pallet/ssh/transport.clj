@@ -157,36 +157,27 @@
 (defn connect
   "Connect to the ssh endpoint, optionally specifying the maximum number
    of connection attempts, and the backoff between each attempt."
-  ([agent endpoint authentication
-    {:keys [max-tries backoff] :or {backoff 2000} :as options}]
-     (loop [max-tries (or max-tries 1)
-            backoff backoff
-            e nil]
-       (if (pos? max-tries)
-         (let [[s e] (try
-                       [(attempt-connect agent endpoint authentication options)]
-                       (catch Exception e
-                         (logging/debugf "connect failed: %s"
-                                         (if-let [e (.getCause e)]
-                                           (.getMessage e)
-                                           (.getMessage e)))
-                         [nil e]))]
-           (if s
-             s
-             (do
-               (logging/debugf "connect backoff: %s" backoff)
-               (Thread/sleep backoff)
-               (recur (dec max-tries) (long (* backoff 1.5)) e))))
-         (throw e))))
-  ([state]
-     (let [state (.state state)
-           ssh-session (:ssh-session state)
-           _ (connect-ssh-session
-              ssh-session (:endpoint state) (:authentication state))
-           sftp-channel (:sftp-channel state)]
-       (connect-sftp-channel
-        sftp-channel (:endpoint state) (:authentication state))
-       state)))
+  [agent endpoint authentication
+   {:keys [max-tries backoff] :or {backoff 2000} :as options}]
+  (loop [max-tries (or max-tries 1)
+         backoff backoff
+         e nil]
+    (if (pos? max-tries)
+      (let [[s e] (try
+                    [(attempt-connect agent endpoint authentication options)]
+                    (catch Exception e
+                      (logging/debugf "connect failed: %s"
+                                      (if-let [e (.getCause e)]
+                                        (.getMessage e)
+                                        (.getMessage e)))
+                      [nil e]))]
+        (if s
+          s
+          (do
+            (logging/debugf "connect backoff: %s" backoff)
+            (Thread/sleep backoff)
+            (recur (dec max-tries) (long (* backoff 1.5)) e))))
+      (throw e))))
 
 (defn close
   "Close any ssh connection to the server specified in the session."
