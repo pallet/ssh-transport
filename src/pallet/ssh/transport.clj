@@ -68,10 +68,11 @@
 (defn wait-for-port-reachable
   "Wait for a port to be reachable. Retries multiple times with a default
    connection timeout on each attempt."
-  [ip port]
+  [ip port {:keys [port-retries port-standoff]
+            :or {port-retries 30 port-standoff 1000}}]
   (logging/debugf "wait-for-port-reachable ip %s port %s" ip port)
-  (when-not (loop [retries 180
-                   standoff 1000]
+  (when-not (loop [retries port-retries
+                   standoff port-standoff]
               (if (port-reachable? ip port)
                 true
                 (when (pos? retries)
@@ -87,11 +88,12 @@
        :port port}))))
 
 (defn connect-ssh-session
-  [ssh-session endpoint authentication]
+  [ssh-session endpoint authentication
+   {:keys [port-retries port-standoff] :as options}]
   (when-not (ssh/connected? ssh-session)
     (logging/debugf "SSH connecting %s" endpoint)
     (try
-      (wait-for-port-reachable (:server endpoint) (:port endpoint 22))
+      (wait-for-port-reachable (:server endpoint) (:port endpoint 22) options)
       (ssh/connect ssh-session)
       (catch Exception e
         (throw
@@ -143,7 +145,7 @@
                       :port (:port endpoint 22)
                       :password (-> authentication :user :password)})
         _ (.setDaemonThread ssh-session true)
-        _ (connect-ssh-session ssh-session endpoint authentication)
+        _ (connect-ssh-session ssh-session endpoint authentication options)
         sftp-channel (ssh/ssh-sftp ssh-session)]
     (connect-sftp-channel sftp-channel endpoint authentication)
     {:ssh-session ssh-session

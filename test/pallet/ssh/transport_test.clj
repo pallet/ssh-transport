@@ -126,14 +126,14 @@
       {:user {:private-key-path (default-private-key-path)
               :public-key-path (default-public-key-path)
               :username (test-username)}}
-      nil)))
+      {:port-retries 2})))
   (try
     (test-connect-fail
      {:server "somewhere-non-existent"}
      {:user {:private-key-path (default-private-key-path)
              :public-key-path (default-public-key-path)
              :username (test-username)}}
-     nil)
+     {:port-retries 2})
     (catch clojure.lang.ExceptionInfo e
       (is (= "SSH port not reachable : server somewhere-non-existent, port 22"
              (.. e getCause getMessage))
@@ -148,4 +148,4 @@
         {:user {:private-key-path (default-private-key-path)
                 :public-key-path (default-public-key-path)
                 :username (test-username)}}
-        {:max-tries 3 :backoff 100})))))
+        {:port-retries 2 :max-tries 3 :backoff 100})))))
