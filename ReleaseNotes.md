@@ -1,3 +1,9 @@
+# 0.4.2
+
+- Update to clj-ssh 0.5.5
+
+- Add trace logging for open
+
 # 0.4.1
 
 - Update to clj-ssh 0.5.4
