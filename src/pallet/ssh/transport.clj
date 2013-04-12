@@ -289,6 +289,7 @@
   (ssh/connected? (:ssh-session state)))
 
 (defn open [endpoint authentication options]
+  (logging/trace "open %s %s %s" endpoint authentication options)
   (let [agent (agent-for-authentication authentication)]
     (ssh-user-credentials agent authentication)
     (connect agent endpoint authentication options)))
