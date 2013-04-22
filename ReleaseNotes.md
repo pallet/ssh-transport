@@ -1,3 +1,7 @@
+# 0.4.3
+
+- Obfuscate logging of passwords
+
 # 0.4.2
 
 - Update to clj-ssh 0.5.5
