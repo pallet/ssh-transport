@@ -40,10 +40,12 @@
 (defn ssh-user-credentials
   "Middleware to user the session :user credentials for SSH authentication."
   [agent authentication]
-  (let [user (:user authentication)]
+  (let [{:keys [username private-key-path private-key password] :as user}
+        (:user authentication)]
     (logging/debugf
-     "SSH user %s :pk-path %s :pk %s"
-     (:username user) (:private-key-path user) (:private-key user))
+     "SSH user %s :private-key-path %s :private-key %s :password %s"
+     username private-key-path private-key
+     (when password (string/replace password #"." "*")))
     (when (or (:private-key-path user) (:private-key user))
       (possibly-add-identity agent user))))
 
@@ -135,7 +137,8 @@
   (logging/debugf
    "attempt-connect username: %s  password: %s"
    (-> authentication :user :username)
-   (-> authentication :user :password))
+   (when-let [pw (-> authentication :user :password)]
+     (string/replace pw #"." "*")))
   (let [ssh-session (ssh/session
                      agent
                      (:server endpoint)
