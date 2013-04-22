@@ -8,7 +8,7 @@ Functions for executing scripts over SSH.  Used by
 Add the following to your `:dependencies`:
 
 ```clj
-[com.palletops/ssh-transport "0.4.2"]
+[com.palletops/ssh-transport "0.4.3"]
 ```
 
 ## License
