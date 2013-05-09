@@ -1,3 +1,7 @@
+# 0.4.4
+
+- Allow agent forwarding on exec
+
 # 0.4.3
 
 - Obfuscate logging of passwords
