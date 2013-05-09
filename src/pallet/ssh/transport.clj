@@ -226,7 +226,7 @@
 (defn exec
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
    {:keys [execv in] :as code}
-   {:keys [output-f pty] :as options}]
+   {:keys [agent-forwarding output-f pty] :as options}]
   (logging/tracef "ssh/exec %s" code)
   (logging/tracef "ssh/exec %s" (pr-str state))
   (logging/tracef "ssh/exec session connected %s" (ssh/connected? ssh-session))
@@ -237,7 +237,8 @@
            {:cmd (string/join " " execv)
             :in in
             :pty (:pty options true)
-            :out :stream})
+            :out :stream
+            :agent-forwarding agent-forwarding})
           shell channel
           stream out-stream
           sb (StringBuilder.)
