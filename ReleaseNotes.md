@@ -1,3 +1,7 @@
+# 0.4.5
+
+- Update to clj-ssh 0.5.6
+
 # 0.4.4
 
 - Allow agent forwarding on exec
