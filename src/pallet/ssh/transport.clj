@@ -225,55 +225,69 @@
 
 (defn exec
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
-   {:keys [execv in] :as code}
+   {:keys [execv in env-cmd env env-fwd prefix] :as code}
    {:keys [agent-forwarding output-f pty] :as options}]
   (logging/tracef "ssh/exec %s" code)
   (logging/tracef "ssh/exec %s" (pr-str state))
   (logging/tracef "ssh/exec session connected %s" (ssh/connected? ssh-session))
-  (if output-f
-    (let [{:keys [channel ^InputStream out-stream]}
-          (ssh/ssh
-           ssh-session
-           {:cmd (string/join " " execv)
-            :in in
-            :pty (:pty options true)
-            :out :stream
-            :agent-forwarding agent-forwarding})
-          shell channel
-          stream out-stream
-          sb (StringBuilder.)
-          buffer-size @ssh-output-buffer-size
-          period @output-poll-period
-          ^bytes bytes (byte-array buffer-size)
-          read-ouput (fn []
-                       (when (pos? (.available stream))
-                         (let [num-read (.read stream bytes 0 buffer-size)
-                               s (String. bytes 0 (int num-read) "UTF-8")]
-                           (output-f s)
-                           (.append sb s)
-                           s)))]
-      (while (ssh/connected-channel? shell)
-        (Thread/sleep period)
-        (read-ouput))
-      (while (read-ouput))
-      (.close stream)
-      (let [exit (ssh/exit-status shell)
-            stdout (str sb)]
+  (let [execv (seq (concat prefix
+                           (when (or env env-fwd)
+                             (concat
+                              [env-cmd]
+                              (map
+                               (fn [k]
+                                 (str (name k) "=\"${" (name k) "}\""))
+                               env-fwd)
+                              (when env
+                                (reduce-kv
+                                 (fn [r k v] (conj r (str (name k) "=" v)))
+                                 []
+                                 env))))
+                           execv))]
+    (if output-f
+      (let [{:keys [channel ^InputStream out-stream]}
+            (ssh/ssh
+             ssh-session
+             {:cmd (string/join " " execv)
+              :in in
+              :pty (:pty options true)
+              :out :stream
+              :agent-forwarding agent-forwarding})
+            shell channel
+            stream out-stream
+            sb (StringBuilder.)
+            buffer-size @ssh-output-buffer-size
+            period @output-poll-period
+            ^bytes bytes (byte-array buffer-size)
+            read-ouput (fn []
+                         (when (pos? (.available stream))
+                           (let [num-read (.read stream bytes 0 buffer-size)
+                                 s (String. bytes 0 (int num-read) "UTF-8")]
+                             (output-f s)
+                             (.append sb s)
+                             s)))]
+        (while (ssh/connected-channel? shell)
+          (Thread/sleep period)
+          (read-ouput))
+        (while (read-ouput))
+        (.close stream)
+        (let [exit (ssh/exit-status shell)
+              stdout (str sb)]
+          (when-not (zero? exit)
+            (logging/warnf "%s Exit status  : %s" (:server endpoint) exit))
+          {:out stdout :exit exit}))
+      (let [{:keys [out exit] :as result} (ssh/ssh
+                                           ssh-session
+                                           (merge
+                                            (when-let [execv (seq execv)]
+                                              {:cmd (apply
+                                                     str
+                                                     (interpose
+                                                      " " (map str execv)))})
+                                            {:in in :pty (:pty options true)}))]
         (when-not (zero? exit)
-          (logging/warnf "%s Exit status  : %s" (:server endpoint) exit))
-        {:out stdout :exit exit}))
-    (let [{:keys [out exit] :as result} (ssh/ssh
-                                         ssh-session
-                                         (merge
-                                          (when-let [execv (seq execv)]
-                                            {:cmd (apply
-                                                   str
-                                                   (interpose
-                                                    " " (map str execv)))})
-                                          {:in in :pty (:pty options true)}))]
-      (when-not (zero? exit)
-        (logging/warnf "Exit status  : %s" exit))
-      result)))
+          (logging/warnf "Exit status  : %s" exit))
+        result))))
 
 (defn forward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}

@@ -53,7 +53,37 @@
         (is (= (:out result) @output))))
     (testing "Error return"
       (let [result (transport/exec t-state {:in "this-should-fail"} nil)]
-        (is (not (zero? (:exit result))))))))
+        (is (not (zero? (:exit result))))))
+    ;; Can't get this to work for some reason
+    ;; (testing "Agent forwarding"
+    ;;   (let [result (transport/exec
+    ;;                 t-state
+    ;;                 {:execv ["/usr/bin/env"]
+    ;;                  :env-cmd "/usr/bin/env"
+    ;;                  :env-fwd [:SSH_AUTH_SOCK]}
+    ;;                 {:agent-forwarding true})]
+    ;;     (is (zero? (:exit result)))
+    ;;     (is (re-find
+    ;;          (re-pattern (System/getenv "SSH_AUTH_SOCK"))
+    ;;          (:out result)))))
+    (testing "Explicit env"
+      (let [tmp (java.io.File/createTempFile "pallet_" "tmp")]
+        (.deleteOnExit tmp)
+        (spit tmp "echo \"${XX}${SSH_CLIENT}\"")
+        (try
+          (let [result (transport/exec
+                        t-state
+                        {:prefix ["/usr/bin/sudo"]
+                         :execv ["/bin/bash" (.getAbsolutePath tmp)]
+                         :env-cmd "/usr/bin/env"
+                         :env-fwd [:SSH_CLIENT]
+                         :env {:XX "abcd"}}
+                        {:agent-forwarding true})]
+            (is (zero? (:exit result)))
+            (is (re-find #"abcd127.0.0.1" (:out result))))
+          (catch Exception e
+            (.delete tmp)
+            (throw e)))))))
 
 (defn test-send
   [endpoint authorisation options]
