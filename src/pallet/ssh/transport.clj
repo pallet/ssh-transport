@@ -52,16 +52,18 @@
 (defn port-reachable?
   "Predicate test if a we can connect to the given `port` on `ip`."
   ([^String ip port timeout]
+     {:pre [(integer? port)(integer? timeout)]}
      (logging/debugf "port-reachable? ip %s port %s timeout %s" ip port timeout)
      (let [socket (doto (java.net.Socket.)
                     (.setReuseAddress false)
                     (.setSoLinger false 1)
-                    (.setSoTimeout timeout))]
+                    (.setSoTimeout timeout))
+           address (java.net.InetSocketAddress. ip (int port))]
        (try
-         (.connect socket (java.net.InetSocketAddress. ip (int port)))
-         (logging/debugf "port-reachable? connected")
+         (.connect socket address (int timeout))
          true
-         (catch IOException _)
+         (catch IOException e
+           (logging/tracef e "port not reachable"))
          (finally
            (try (.close socket) (catch IOException _))))))
   ([ip port]
