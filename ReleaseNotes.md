@@ -1,3 +1,9 @@
+## 0.5.1
+
+- Add debug and trace level logging
+
+- Fix timeout in port-reachable?
+
 # 0.5.0
 
 - Break out components of the command map
