@@ -200,6 +200,7 @@
   [{:keys [sftp-channel] :as state} source destination {:keys [mode]}]
   [(ssh/sftp sftp-channel {} :put source destination)
    (when mode
+     (logging/debugf "send-text set mode %s %s" destination mode)
      (ssh/sftp sftp-channel {} :chmod mode destination))])
 
 (defn send-text
@@ -208,6 +209,7 @@
     sftp-channel {}
     :put (java.io.ByteArrayInputStream. (.getBytes source)) destination)
    (when mode
+     (logging/debugf "send-text set mode %s %s" destination mode)
      (ssh/sftp sftp-channel {} :chmod mode destination))])
 
 (defn receive
@@ -230,6 +232,7 @@
    {:keys [execv in env-cmd env env-fwd prefix] :as code}
    {:keys [agent-forwarding output-f pty] :as options}]
   (logging/tracef "ssh/exec %s" code)
+  (logging/tracef "ssh/exec options %s" options)
   (logging/tracef "ssh/exec %s" (pr-str state))
   (logging/tracef "ssh/exec session connected %s" (ssh/connected? ssh-session))
   (let [execv (seq (concat prefix
@@ -246,6 +249,7 @@
                                  []
                                  env))))
                            execv))]
+    (logging/tracef "ssh/exec command %s" (string/join " " execv))
     (if output-f
       (let [{:keys [channel ^InputStream out-stream]}
             (ssh/ssh
