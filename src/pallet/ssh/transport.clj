@@ -8,24 +8,13 @@
   (:import
    [java.io InputStream IOException]))
 
-;;; Default clj-ssh agent
-(defonce default-agent-atom (atom nil))
+(defn- get-ssh-agent
+  [options]
+  (ssh/ssh-agent options))
 
-(defn default-agent
-  []
-  (or @default-agent-atom
-      (swap! default-agent-atom
-             (fn [agent]
-               (or agent (ssh/ssh-agent {}))))))
-
-(defn agent-for-authentication
-  "Returns an agent to use for authentication.  Returns the system ssh-agent,
-  unless the :temp-key is set in the :user map, in which case a local
-  ssh-agent is returned."
-  [authentication]
-  (if (-> authentication :user :temp-key)
-    (ssh/ssh-agent {:use-system-ssh-agent nil})
-    (default-agent)))
+(def ^{:arglists '[[options]]} ssh-agent
+  "Return an ssh agent for the specified options"
+  (memoize get-ssh-agent))
 
 (defn possibly-add-identity
   "Try adding the given identity, logging issues, but not raising an error."
@@ -314,6 +303,6 @@
 
 (defn open [endpoint authentication options]
   (logging/trace "open %s %s %s" endpoint authentication options)
-  (let [agent (agent-for-authentication authentication)]
+  (let [agent (ssh-agent (:ssh-agent-options options))]
     (ssh-user-credentials agent authentication)
     (connect agent endpoint authentication options)))
