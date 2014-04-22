@@ -1,4 +1,4 @@
-(defproject com.palletops/ssh-transport "0.5.2-SNAPSHOT"
+(defproject com.palletops/ssh-transport "0.6.0"
   :description "Functions for executing scripts over ssh."
   :url "http://palletops.com"
   :license {:name "Eclipse Public License"
