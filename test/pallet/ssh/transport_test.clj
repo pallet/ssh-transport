@@ -25,8 +25,8 @@
          (. System getProperty "user.name")))
 
 (defn test-exec
-  [endpoint authorisation options]
-  (let [t-state (transport/open endpoint authorisation options)]
+  [target options]
+  (let [t-state (transport/open target options)]
     (testing "Default shell"
       (let [result (transport/exec t-state {:in "ls /; exit $?"} nil)]
         (is (zero? (:exit result)))
@@ -86,8 +86,8 @@
             (throw e)))))))
 
 (defn test-send
-  [endpoint authorisation options]
-  (let [t-state (transport/open endpoint authorisation options)]
+  [target options]
+  (let [t-state (transport/open target options)]
     (testing "send"
       (filesystem/with-temp-file [tmp-src "src"]
         (filesystem/with-temp-file [tmp-dest "dest"]
@@ -109,8 +109,8 @@
           (is (= "src" (slurp tmp-dest))))))))
 
 (defn test-connect-fail
-  [endpoint authorisation options]
-  (let [t-state (transport/open endpoint authorisation options)]
+  [target options]
+  (let [t-state (transport/open target options)]
     (is false "this test is designed to fail on open")))
 
 (use-fixtures :once (logutils/logging-threshold-fixture))
@@ -132,50 +132,65 @@
 
 (deftest exec-test
   (test-exec
-   {:server "localhost"}
-   {:user {:private-key-path (default-private-key-path)
-           :public-key-path (default-public-key-path)
-           :username (test-username)}}
+   [{:endpoint {:server "localhost"}
+     :credentials {:private-key-path (default-private-key-path)
+                   :public-key-path (default-public-key-path)
+                   :username (test-username)}}]
    nil))
 
 (deftest send-test
   (test-send
-   {:server "localhost"}
-   {:user {:private-key-path (default-private-key-path)
-           :public-key-path (default-public-key-path)
-           :username (test-username)}}
+   [{:endpoint {:server "localhost"}
+     :credentials {:private-key-path (default-private-key-path)
+                   :public-key-path (default-public-key-path)
+                   :username (test-username)}}]
    nil))
 
 (deftest connection-fail-test
   (is
    (thrown-with-msg?
-     clojure.lang.ExceptionInfo
-     #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
-     (test-connect-fail
-      {:server "somewhere-non-existent"}
-      {:user {:private-key-path (default-private-key-path)
-              :public-key-path (default-public-key-path)
-              :username (test-username)}}
-      {:port-retries 2})))
+    clojure.lang.ExceptionInfo
+    #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
+    (test-connect-fail
+     [{:endpoint {:server "somewhere-non-existent"}
+       :credentials {:private-key-path (default-private-key-path)
+                     :public-key-path (default-public-key-path)
+                     :username (test-username)}}]
+     {:max-tries 2})))
   (try
     (test-connect-fail
-     {:server "somewhere-non-existent"}
-     {:user {:private-key-path (default-private-key-path)
-             :public-key-path (default-public-key-path)
-             :username (test-username)}}
-     {:port-retries 2})
+     [{:endpoint {:server "somewhere-non-existent"}
+       :credentials {:private-key-path (default-private-key-path)
+                     :public-key-path (default-public-key-path)
+                     :username (test-username)}}]
+     {:max-tries 2})
     (catch clojure.lang.ExceptionInfo e
-      (is (= "SSH port not reachable : server somewhere-non-existent, port 22"
+      (is (= "java.net.UnknownHostException: somewhere-non-existent"
              (.. e getCause getMessage))
-          "Cause should be a port not reachable exception")))
+          "Cause should be an unknown host exception")))
   (testing "with retries"
     (is
      (thrown-with-msg?
-       clojure.lang.ExceptionInfo
-       #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
-       (test-connect-fail
-        {:server "somewhere-non-existent"}
-        {:user {:private-key-path (default-private-key-path)
-                :public-key-path (default-public-key-path)
-                :username (test-username)}}
-        {:port-retries 2 :max-tries 3 :backoff 100})))))
+      clojure.lang.ExceptionInfo
+      #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
+      (test-connect-fail
+       [{:endpoint {:server "somewhere-non-existent"}
+         :credentials {:private-key-path (default-private-key-path)
+                       :public-key-path (default-public-key-path)
+                       :username (test-username)}}]
+       {:max-tries 2 :backoff 100}))))
+  (testing "with jump-host"
+    (is
+     (thrown-with-msg?
+      clojure.lang.ExceptionInfo
+      #"SSH connect: server somewhere-non-existent port 22 user.*password.*"
+      (test-connect-fail
+       [{:endpoint {:server "localhost"}
+         :credentials {:private-key-path (default-private-key-path)
+                       :public-key-path (default-public-key-path)
+                       :username (test-username)}}
+        {:endpoint {:server "somewhere-non-existent"}
+         :credentials {:private-key-path (default-private-key-path)
+                       :public-key-path (default-public-key-path)
+                       :username (test-username)}}]
+       {:max-tries 1 :backoff 100})))))
