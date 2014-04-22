@@ -1,3 +1,17 @@
+## 0.6.0
+
+- Add jump-host support
+  This changes the arguments for open to take a target sequence of hosts to
+  connect though.  Each element in the sequence is a map with :endpoint and
+  :credenttial keys.
+
+  Also changes to always use an in-memory agent, initialised with the keys
+  in the system agent.
+
+- Add :ssh-agent-options to open options
+  The :ssh-agent-options can be used to pass options to the ssh-agent used
+  for the connection.  Removes all logic around agent construction.
+
 ## 0.5.1
 
 - Add debug and trace level logging
@@ -41,7 +55,7 @@
   agent when :temp-key is true.
 
 - Make standoff increase in connection attempts
-  In order to reduce the number of connection attempts back-off connection 
+  In order to reduce the number of connection attempts back-off connection
   attempts by a constant factor (fixed at 1.5 for now).
 
   Also improves logging of connection attempts.
