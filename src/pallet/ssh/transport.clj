@@ -298,14 +298,14 @@
 
 (defn forward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
+   local-port
    remote-port
-   local-port]
+   remote-host]
   (ssh/forward-local-port
-   (ssh/the-session ssh-session) local-port (:server endpoint) remote-port))
+   (ssh/the-session ssh-session) local-port remote-port remote-host))
 
 (defn unforward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
-   remote-port
    local-port]
   (ssh/unforward-local-port (ssh/the-session ssh-session) local-port))
 
