@@ -26,15 +26,18 @@
   {:endpoint Endpoint
    :credentials Credentials})
 
-(def State
-  {:ssh-session (schema/pred ssh/session? "ssh session")})
-
 (def OpenOptions
   {(optional-key :max-tries) schema/Int
    (optional-key :backoff) schema/Int
    ;; (optional-key :port-retries) schema/Int
    (optional-key :ssh-agent-options) {schema/Keyword schema/Any}
    (optional-key :strict-host-key-checking) (enum :no :yes)})
+
+(def State
+  {:ssh-session (schema/pred ssh/session? 'session?)
+   :sftp-channel schema/Any
+   :target [Target]
+   :options (schema/maybe OpenOptions)})
 
 (defn obfuscate-credentials
   [credentials]
@@ -151,6 +154,7 @@
         _ (connect-ssh-session ssh-session (last target) options)
         sftp-channel (ssh/ssh-sftp (ssh/the-session ssh-session))]
     (connect-sftp-channel sftp-channel (last target))
+    (ssh/session? ssh-session)
     {:ssh-session ssh-session
      :sftp-channel sftp-channel
      :target target
@@ -160,6 +164,7 @@
   "Connect to the ssh endpoint, optionally specifying the maximum number
    of connection attempts, and the backoff between each attempt."
   [agent target {:keys [max-tries backoff] :or {backoff 2000} :as options}]
+  {:post [(validate State %)]}
   (loop [max-tries (or max-tries 1)
          backoff backoff
          e nil]
@@ -293,14 +298,14 @@
 
 (defn forward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
+   local-port
    remote-port
-   local-port]
+   remote-host]
   (ssh/forward-local-port
-   (ssh/the-session ssh-session) local-port (:server endpoint) remote-port))
+   (ssh/the-session ssh-session) local-port remote-port remote-host))
 
 (defn unforward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
-   remote-port
    local-port]
   (ssh/unforward-local-port (ssh/the-session ssh-session) local-port))
 

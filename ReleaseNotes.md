@@ -1,3 +1,14 @@
+## 0.7.0
+
+- Update to clj-ssh 0.5.10
+  Fixes an issue with the session? predicate.
+
+- Allow :options to be nil
+
+- Change forward-to-local, unforward-to-local arguments
+
+- Enforce State schema
+
 ## 0.6.0
 
 - Add jump-host support
