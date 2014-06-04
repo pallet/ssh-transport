@@ -37,7 +37,7 @@
   {:ssh-session (schema/pred ssh/session? 'session?)
    :sftp-channel schema/Any
    :target [Target]
-   :options OpenOptions})
+   :options (schema/maybe OpenOptions)})
 
 (defn obfuscate-credentials
   [credentials]
