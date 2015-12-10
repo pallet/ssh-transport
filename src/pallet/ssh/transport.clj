@@ -297,15 +297,17 @@
 
 (defn forward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
+   remote-host
    remote-port
    local-port]
-  (ssh/forward-local-port
-   ssh-session local-port (:server endpoint) remote-port))
+  (logging/tracef "forward-to-local %s %s %s"
+                  remote-host remote-port local-port)
+  (ssh/forward-local-port ssh-session local-port remote-port remote-host))
 
 (defn unforward-to-local
   [{:keys [ssh-session sftp-channel endpoint authentication] :as state}
-   remote-port
    local-port]
+  (logging/tracef "unforward-to-local %s" local-port)
   (ssh/unforward-local-port ssh-session local-port))
 
 (defn connected?
